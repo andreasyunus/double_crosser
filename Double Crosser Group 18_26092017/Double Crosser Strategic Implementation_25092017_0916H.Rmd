@@ -1,0 +1,529 @@
+---
+title: "Strategic Implementation of Double Crosser Agent Based On Axelrod Framework"
+author: "Andreas Yunus (4740521), Mohammad Ammar Faiq (4697537), Yosira Jawata (4742060), Stijn Savelkoul (4745795)"
+date: "9/25/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+The code that we implement is Double Crosser agent based on Axelrod strategic framework in Python. Axelrod framework (https://github.com/Axelrod-Python/Axelrod) is a research tool for iterated prisoners dilemma that originally developed in Python. In this framework we can have access to more than 200 strategies that developed by many contributors. According to our own simulation by putting 12 agents in the tournament developed by Yugdeep Bangar (yugdeep.bangar@gmail.com), our dynamic agent (Double Crosser) is quite consistent in the tournament. We ran multiple rounds with other agents that we developed based on Axelrod framework (tit for tat, alt strategy, back stabber, grudger, meta hunter) and the result will be explained further in this document.
+
+Additionally, we would like to motivate the reason why we choose Double Crosser and put it in comparison with Zero Determinant strategy which is a kind of adaptive strategy for evolving environment. While Zero Determinant strategy will work well in evolving environment with many "smart" agent, it ranked from second to last based on result in Mike Shulman simulation in "Zero-Determinant Strategies in the Iterated Prisoner's Dilemma" (Mike Shulman, 2012). Based on those result, we don't think in this case we have many "smart" agent in the class, hence more "traditional" will perform better in not highly adaptive environment like reported by Mike Shulman in the blog (Mike Shulman, 2012, retrieved from https://golem.ph.utexas.edu/category/2012/07/zerodeterminant_strategies_in.html).
+
+## Method
+
+### Double Crosser
+
+Double Crosser agent was originally developed in Python by Thomas Campbell in 2015. In order to fulfill the objective of EPA1215 Data Analytics and Visualization, we modified the original code that based in Python to R language.
+
+Double Crosser agent is a dynamic agent that can make a decision to choose between 2 strategies, Backstabber and Alt strategy. Backstabber strategy is a kind of "revenge" strategic that will give "defect" output if the opponent chooses to defect for more than 3 times. This strategy starts with "playing nice" (always cooperate). On the other hands, Alt strategy chooses to "defect" if the opponent has defected for 2 times based on the history. Double Crosser has a certain condition which decides selected strategy. If 7 < current round <= 180 and there is no defections in the first 7 rounds, our Double Crosser agent will activate Alt strategy which will defect if the opponent chooses to defect 2 times in a row, else the agent will activate Backstabber strategy as its defensive strategy. 
+
+### Meta Hunter
+
+Meta Hunter is also one of strategies in Axelrod libraries, that was originally developed by Karol Langner. The strategy we use in our R tournament is called Meta Hunter Aggressive, an improvement of the original Meta Hunter strategy. It was developed by Marc Harper. There is a few modifications in our R program because the agent will start cooperating if there is no history in book record (first bid). Then, if number of rounds is more than 100 rounds, it will use tit for tat strategy which will defect if opponent defects, else it will cooperate. 
+
+### Grudger
+
+Grudger is a strategy that starts to defect and will always defect if the opponent starts to defect. This agent will start the tournament by "playing nice" ("cooperate"). It was developed by Li in 2011.
+
+### Tit for Tat
+
+Tit for tat is a classic strategy. The agent will start with cooperate move then will start to defect if the opponent's previous bid is defect. However, it will start "cooperate" again if the opponent's previous bid was "cooperate". It is known for copying opponent's move.
+
+## Simulation Result
+
+Figure 1 and 2 show the result of simulation based on Mojones (http://mojones.net/evolving-strategies-for-an-iterated-prisoners-dilemma-tournament.html) and our own simulation respectively. Double Crosser is one of the top performer in both tournaments as shown in the following graphs.
+
+![Figure 1. Mojones simulation result.](http://mojones.net/images/best_10_strategies.png)
+
+![Figure 2. Team simulation Result - Table](http://i67.tinypic.com/2ilfn6d.png)
+
+
+![Figure 3. Team simulation Result - Graph](http://i66.tinypic.com/2jdq5tx.jpg)
+
+## Program Explanation and Snapshot
+
+### Double Crosser (Main Agent for Tournament)
+
+The implementation and explanation of program components or functions are explained directly in the program in form of comment by using hashtags (#).
+
+```{r Double Crosser}
+# Calling the library
+library(R6)
+
+# Define agent class
+Agent <- R6Class(
+  "Agent",
+
+  public = list(
+    # Define variables
+    bid = NULL,
+    book = NULL,
+    greeting = NULL,
+    id = NULL,
+    opponent_id = NULL,
+    opponent_greeting = NULL,
+    round = NULL,
+    response = NULL,
+    
+    # Define book function
+    set_book = function(book = NA) {
+      self$book <- book
+    },
+    
+    # Define book function
+    set_id = function(id = NA) {
+      self$id = id
+    },
+    
+    # Define opponent id function
+    set_opponent_id = function(opponent_id = NA) {
+      self$opponent_id = opponent_id
+    },
+    
+    # Define set response
+    set_response = function(response = NA) {
+      self$response <- response
+    },
+    
+    # Define round function
+    set_round = function(round = NA) {
+      self$round <- round
+    },
+    
+    # Define set greeting
+    set_greeting = function() {
+      self$greeting <- "Let's Rumble!"
+    },
+    
+    # Define receive greeting
+    receive_greeting = function(greeting = NA) {
+      self$opponent_greeting = greeting
+    },
+    
+    # Main function
+    get_bid = function() {
+      
+      # If there is no in the book history, it will execute Back Stabber strategy
+      # else if opponent trigger Alt strategy 
+      # if (7 < current round <= 180) and no defections in first 7 rounds (trigger A strategy), Double Crosser will activate Alt strategy
+      if(!(nrow(book))){
+        self$myBackStabber()
+      } else {
+        if(self$opponent_trigger_A()){
+          self$myAStrategy()
+        } else {
+          self$myBackStabber()
+        }
+      }
+      },
+    
+    # Define Alt strategy
+    # Alt strategy will defect if opponent did 2 defections consecutively, else Back Stabber is our default option
+    myAStrategy = function(){
+      if(self$id == id1){
+        if(!(nrow(book))){
+          
+          self$bid <- "cooperate"
+          
+        } else if (nrow(book) > 2){
+          if ((tail(book,2)[['bid2']] == c('defect','defect'))[1] & (tail(book,2)[['bid2']] == c('defect','defect'))[2]){
+            self$bid <- "defect"
+          }
+        } else {
+          self$bid <- "cooperate"
+        }
+        
+      } else if(self$id == id2){
+        if(!(nrow(book))) {
+          
+          self$bid <- "cooperate"
+          
+        } else if (nrow(book) > 2){
+          if ((tail(book,2)[['bid1']] == c('defect','defect'))[1] & (tail(book,2)[['bid1']] == c('defect','defect'))[2]){
+            self$bid <- "defect"
+          }
+        } else {
+          self$bid <- "cooperate"
+        }
+      }
+    },
+    
+    # Explanation of trigger Alt strategy and opponent defect in first round: if (7 < current round <= 180) and no defections in first 7 rounds (trigger Alt strategy)
+    opponent_trigger_A = function(){
+      
+      if (self$opponent_defectin_firstround()){
+        return(FALSE)
+      }
+      
+      # return(TRUE)
+      if(!(nrow(book))){
+        condition <- (7 < (nrow(book)+1)) & (((nrow(book)+1) <= 180))
+        return(condition)
+      } else {
+        return(FALSE)
+      }
+    },
+    
+    # Check whether opponent defect in first 7 round
+    opponent_defectin_firstround = function(){
+      if((self$id == id1) & (nrow(book) < 7)){
+        if(nrow(subset(book, bid2 == "defect")) > 0){
+          return(FALSE)
+        } else {
+          return(TRUE)
+        }
+      } else if((self$id == id2) & (nrow(book) < 7)){
+        if(nrow(subset(book, bid1 == "defect")) > 0){
+          return(FALSE)
+        } else {
+          return(TRUE)
+        }
+      } else {
+        return(TRUE)
+      }
+    },
+    
+    # Back Stabber strategy will start defect if opponent is defecting 3 times, else it will cooperate. It will start the tournament by cooperating.
+    myBackStabber = function(){
+      if(self$id == id1){
+        if(!(nrow(book))){
+          
+          self$bid <- "cooperate"
+          
+        } 
+        else if (nrow(subset(book, bid2 == "defect")) > 3){
+          self$bid <- "defect"
+          
+        } else {
+          self$bid <- "cooperate"
+        }
+        
+      } else if(self$id == id2){
+        if(!(nrow(book))){
+          
+          self$bid <- "cooperate"
+          
+        } 
+        else if (nrow(subset(book, bid1 == "defect")) > 3){
+          self$bid <- "defect"
+        } else {
+          self$bid <- "cooperate"
+        }
+      }
+    }
+  )
+)
+```
+
+### Meta Hunter (for our team simulation purpose only)
+
+```{r Meta Hunter}
+library(R6)
+
+# Define agent class
+Agent <- R6Class(
+  "Agent",
+  
+  # Define variables
+  public = list(
+    bid = NULL,
+    book = NULL,
+    greeting = NULL,
+    id = NULL,
+    opponent_id = NULL,
+    opponent_greeting = NULL,
+    round = NULL,
+    response = NULL,
+    
+    # Define set_book function
+    set_book = function(book = NA) {
+      self$book <- book
+    },
+    
+    # Define set_id function
+    set_id = function(id = NA) {
+      self$id = id
+    },
+    
+    # Define set_opponent_id function
+    set_opponent_id = function(opponent_id = NA) {
+      self$opponent_id = opponent_id
+    },
+    
+    # Define set_response function
+    set_response = function(response = NA) {
+      self$response <- response
+    },
+    
+    # Define set_round function
+    set_round = function(round = NA) {
+      self$round <- round
+    },
+    
+    # Define set_greeting function
+    set_greeting = function() {
+      self$greeting <- "Let's Rumble!"
+    },
+    
+    # Define receive_greeting
+    receive_greeting = function(greeting = NA) {
+      self$opponent_greeting = greeting
+    },
+    
+    # Define get_bid function
+    # It's the main program of Meta Hunter
+    # It will start the game by cooperating, if the round number already more than 100 and the opponent defect, it will defect, else it will cooperate
+    get_bid = function() {
+      
+      # Reading the id, if id1 then it has to read the row in bid2
+      if(self$id == id1){
+        if(!(nrow(book))){
+          
+          self$bid <- "cooperate"
+          
+        } 
+        else if (nrow(book) > 100){
+          if (tail(book,1)['bid2'] == "defect"){
+          self$bid <- "defect"
+          }
+          # coba combine method sample
+        } 
+        else {
+          self$bid <- "cooperate"
+          
+        }
+      # Reading the id, if self id equals to id2, then it will check the history of bid1.
+      } else if(self$id == id2){
+        if(!(nrow(book))){
+          
+          self$bid <- "cooperate"
+          
+        } 
+        else if (nrow(book) > 100){
+          if (tail(book,1)['bid1'] == "defect"){
+            self$bid <- "defect"
+          }
+        } 
+        else {
+          self$bid <- "cooperate"
+          
+        }
+      }
+    }
+  )
+)
+```
+
+### Grudger (for our team simulation purpose only)
+
+```{r Grudger}
+library(R6)
+
+# Define agent class
+Agent <- R6Class(
+  "Agent",
+  
+  # Define required variables
+  public = list(
+    bid = NULL,
+    book = NULL,
+    greeting = NULL,
+    id = NULL,
+    opponent_id = NULL,
+    opponent_greeting = NULL,
+    round = NULL,
+    response = NULL,
+    
+    # Define set_book function
+    set_book = function(book = NA) {
+      self$book <- book
+    },
+    
+    # Define set_id function
+    set_id = function(id = NA) {
+      self$id = id
+    },
+    
+    # Define set_opponent_id function
+    set_opponent_id = function(opponent_id = NA) {
+      self$opponent_id = opponent_id
+    },
+    
+    # Define set_response function
+    set_response = function(response = NA) {
+      self$response <- response
+    },
+    
+    # Define set_round function
+    set_round = function(round = NA) {
+      self$round <- round
+    },
+    
+    # Define set_greeting function
+    set_greeting = function() {
+      self$greeting <- "Let's Rumble!"
+    },
+    
+    # Define receive greeting function
+    receive_greeting = function(greeting = NA) {
+      self$opponent_greeting = greeting
+    },
+    
+    # The main program
+    # It will start the game by cooperating. However if round is already more than 100, then the opponent defects, it will bid defect forever
+    get_bid = function() {
+      # Check the id, if agent gets id1, then it will check history in bid2.
+      if(self$id == id1){
+        if(!(nrow(book))){
+          
+          self$bid <- "cooperate"
+          
+        } 
+        else if (nrow(book) > 100){
+          if (tail(book,1)['bid2'] == "defect"){
+          self$bid <- "defect"
+          }
+          # coba combine method sample
+        } 
+        else {
+          self$bid <- "defect"
+          
+        }
+        # check the id, if the agent gets id2, then it will check history in bid1
+      } else if(self$id == id2){
+        if(!(nrow(book))){
+          
+          self$bid <- "cooperate"
+          
+        } 
+        else if (nrow(book) > 100){
+          if (tail(book,1)['bid1'] == "defect"){
+            self$bid <- "defect"
+          }
+        } 
+        else {
+          self$bid <- "defect"
+          
+        }
+      }
+    },
+    
+    formulate_bid = function() {
+      self$get_bid()
+    }
+  )
+)
+```
+
+### Tit for Tat (for our team simulation purpose only)
+
+```{r Tit for Tat}
+library(R6)
+
+# Define the agent class
+Agent <- R6Class(
+  "Agent",
+  
+  # Define the required variables
+  public = list(
+    bid = NULL,
+    book = NULL,
+    greeting = NULL,
+    id = NULL,
+    opponent_id = NULL,
+    opponent_greeting = NULL,
+    round = NULL,
+    response = NULL,
+    
+    # Define set_book function
+    set_book = function(book = NA) {
+      self$book <- book
+    },
+    
+    # Define set_id function
+    set_id = function(id = NA) {
+      self$id = id
+    },
+    
+    # Define set_opponent_id function
+    set_opponent_id = function(opponent_id = NA) {
+      self$opponent_id = opponent_id
+    },
+    
+    # Define set_response function
+    set_response = function(response = NA) {
+      self$response <- response
+    },
+    
+    # Define set_round function
+    set_round = function(round = NA) {
+      self$round <- round
+    },
+    
+    # Define set_greeting function
+    set_greeting = function() {
+      self$greeting <- "Let's Rumble!"
+    },
+    
+    # Define receive_greeting function
+    receive_greeting = function(greeting = NA) {
+      self$opponent_greeting = greeting
+    },
+    
+    # The main program for bidding
+    # It will play classic tit for tat strategy which start playing "cooperate", then defect if opponent defects. If opponent cooperates again, it will cooperate.
+    get_bid = function() {
+      # Check the id, if id1 then agent will check history bid2 in book
+      if(self$id == id1){
+        if(!(nrow(book))){
+          
+          self$bid <- "cooperate"
+          
+        } 
+        else if (tail(book,1)['bid2'] == "defect"){
+          self$bid <- "defect"
+          
+          # coba combine method sample
+        } 
+        else if (tail(book,1)['bid2'] == "cooperate"){
+          self$bid <- "cooperate"
+          
+        }
+        # Check id, if id2, agent will check history of bid1 in book
+      } else if(self$id == id2){
+        if(!(nrow(book))){
+          
+          self$bid <- "cooperate"
+          
+        } 
+        else if (tail(book,1)['bid1'] == "defect"){
+          self$bid <- "defect"
+          
+          # coba combine method sample
+        } 
+        else if (tail(book,1)['bid1'] == "cooperate"){
+          self$bid <- "cooperate"
+          
+        }
+      }
+    }
+  )
+)
+```
+
+## Conclusion
+
+In the end, based on the result of simulation and objective of data visualization course, we submit our Double Crosser agent which use complex and dynamic strategy based on the bidding history of other agents. Based on the above simulation result, our agent ranks number 3 in the simulation developed by Yugdeep Bangar (yugdeep.bangar@gmail.com).  In the end, we would like to deploy our "Double Crosser" agent and we hope it will become top performer in the tournament.
+
+## References
+
+1. A Research Tool for The Iterated Prisoner's Dilemma. (2017). Retrieved from https://github.com/Axelrod-Python/Axelrod
+2. Martin Jones. (2015). Evolving Strategies for an Iterated Prisoner's Dilemma Tournament. Retrieved from http://mojones.net/evolving-strategies-for-an-iterated-prisoners-dilemma-tournament.html
+3. Mike Shulman. (2012). Zero-Determinant Strategies in the Iterated Prisoner's Dilemma. Retrieved from https://golem.ph.utexas.edu/category/2012/07/zerodeterminant_strategies_in.html
+4. Yugdeep Bangar. (2017). Coding Tournament. Retrieved from yugdeep.bangar@gmail.com
